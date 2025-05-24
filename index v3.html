@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Grafo – Nueva Data</title>
+
+  <!-- vis-network -->
+  <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+
+  <style>
+    html,body,#net{width:100%;height:100%;margin:0;}
+    body{font-family:system-ui,Arial,sans-serif;}
+  </style>
+</head>
+<body>
+  <div id="net"></div>
+
+<script>
+/* ---------- 1. Reglas (deductivo) ---------- */
+const schema = {
+  "Persona-Persona": ["Friend_of","Spouse_of","Parent_of","Married_to"],
+  "Persona-Org"    : ["Founder_of","Co-Founder_of","Advisor_to","Investor_in"],
+  "Persona-Proyecto":["Created_project"],
+  "Org-Persona"    : ["CEO_is"],
+  "Org-Org"        : ["Rebranded_as","Acquired","Investor_in","Parent","Founder_of","Partner_in"],
+  "Org-Proyecto"   : ["Created_project","Raised_via","Partner_in"]
+};
+
+/* ---------- 2. Listas de tipos ---------- */
+const PERSONAS = new Set([
+  "Jordi Hays","Ian Kar","John Coogan","David Renteln","Mike Salana",
+  "Sarah Chase","Roman Hays","Ruby Hays","Jordi Hays’ Father","Jordi Hays’ Mother",
+  "Wife","Son","Maria Tavierne","Matt Jung","Brian Keller","Charlie Carlisle"
+]);
+
+const ORGS = new Set([
+  "PlayDSK","Soylent","Lucy","JohnCooganPlus","Termsheets","Founders Fund","TBPN",
+  "Imagine K-12","Y Combinator","Starco Brands","Branded Native","Likewise",
+  "Party Round","Capital","Rho","New York Tech Week","Tech Week (a16z)","Rorra",
+  "a16z","Gradient Ventures","Party Grounds","Yuga Labs"
+]);
+
+const typeOf = n => PERSONAS.has(n) ? "Persona"
+                 : ORGS.has(n)      ? "Org"
+                 : "Proyecto";
+
+/* ---------- 3. Tu CSV ---------- */
+const csv = `parent_entity_id,child_entity_id,relation_type,role_title,start_date
+Jordi Hays,Ian Kar,Friend_of,Friend,2020-12-01
+John Coogan,David Renteln,Friend_of,Childhood Friend,
+John Coogan,Mike Salana,Friend_of,Friend,2020-04-01
+Jordi Hays,Sarah Chase,Spouse_of,Husband,
+Jordi Hays,Roman Hays,Parent_of,Son,2022-01-01
+Jordi Hays,Ruby Hays,Parent_of,Father,2024-08-01
+Jordi Hays’ Father,Jordi Hays,Parent_of,Father,1997-01-01
+Jordi Hays’ Mother,Jordi Hays,Parent_of,Mother,1997-01-01
+John Coogan,Wife,Married_to,, 
+John Coogan,Son,Parent_of,, 
+John Coogan,PlayDSK,Co-Founder_of,Co-Founder,2012-01-01
+John Coogan,Soylent,Co-Founder_of,Co-Founder & CTO,2012-05-01
+John Coogan,Lucy,Co-Founder_of,Co-Founder,2016-08-01
+John Coogan,JohnCooganPlus,Created_project,Creator,2020-11-05
+John Coogan,Termsheets,Created_project,Creator,2019-01-01
+John Coogan,Founders Fund,Advisor_to,EIR,2023-01-01
+John Coogan,TBPN,Created_project,Host,2025-02-01
+Soylent,Imagine K-12,Parent,Incubator,2012-05-01
+Soylent,Y Combinator,Parent,Accelerator,2012-08-01
+Lucy,Y Combinator,Parent,Accelerator (W18),2018-03-22
+Soylent,Starco Brands,Acquired,,2023-02-21
+John Coogan,JohnCooganPlus,Created_project,YouTuber,2020-11-01
+John Coogan,Founders Fund,Advisor_to,EIR,2023-01-01
+John Coogan,TBPN,Created_project,Host,2025-02-01
+Jordi Hays,Branded Native,Founder_of,Founder & ex-CEO,2016-01-01
+Maria Tavierne,Branded Native,CEO_is,CEO,2023-05-01
+Jordi Hays,Likewise,Co-Founder_of,Co-Founder,2019-01-01
+Matt Jung,Likewise,Co-Founder_of,Co-Founder,2019-01-01
+Jordi Hays,Party Round,Founder_of,Co-Founder,2021-03-01
+Sarah Chase,Party Round,Founder_of,Co-Founder,2021-03-01
+Party Round,Capital,Rebranded_as,,2022-10-04
+Capital,Rho,Acquired,,2023-10-01
+Capital,New York Tech Week,Created_project,,2022-08-01
+Tech Week (a16z),New York Tech Week,Acquired,,2023-03-01
+Brian Keller,Rorra,Founder_of,Co-Founder,2024-11-01
+Charlie Carlisle,Rorra,Founder_of,Co-Founder,2024-11-01
+Jordi Hays,Rorra,Founder_of,Co-Founder,2024-11-01
+a16z,Party Round,Investor_in,,2021-11-01
+Gradient Ventures,Party Round,Investor_in,,2021-11-01
+Party Round,Burn the Runway,Created_project,,2021-06-01
+Party Round,Startup Ipsum,Created_project,,2021-06-14
+Party Round,Helpful VCs,Created_project,,2021-07-10
+Party Round,BIGTECH Fellowship,Created_project,,2021-09-17
+Party Round,Startup Supreme,Created_project,,2022-06-02
+Party Round,Poached Eggs,Created_project,,2022-03-16
+Party Round,VC Puzzle,Created_project,,2022-04-05
+Party Round,Party Round Mag,Created_project,,2022-09-20
+Party Grounds,Partner_in,Coffee Collab,2021-12-15
+Yuga Labs,Party Round,Raised_via,Party Round Platform,2022-03-15
+a16z,Tech Week (a16z),Founder_of,,2023-03-01`;
+
+/* ---------- 4. Parse & limpiar ---------- */
+const csvArr = t=>{
+  const [head,...lines]=t.trim().split(/\r?\n/);
+  const k=head.split(",").map(s=>s.trim());
+  return lines.map(l=>l.split(",").map(c=>c.trim()))
+              .map(c=>k.reduce((o,kk,i)=>{o[kk]=c[i];return o;},{}));
+};
+
+const rows = csvArr(csv);
+const nodes = new Map();
+const edges = [];
+
+rows.forEach(r=>{
+  const pt = typeOf(r.parent_entity_id);
+  const ct = typeOf(r.child_entity_id);
+  const key = `${pt}-${ct}`;
+  if(!(schema[key]||[]).includes(r.relation_type)) return; // descarta violaciones
+
+  if(!nodes.has(r.parent_entity_id))
+      nodes.set(r.parent_entity_id,{id:r.parent_entity_id,label:r.parent_entity_id,group:pt});
+  if(!nodes.has(r.child_entity_id))
+      nodes.set(r.child_entity_id ,{id:r.child_entity_id ,label:r.child_entity_id ,group:ct});
+
+  edges.push({from:r.parent_entity_id,to:r.child_entity_id,label:r.relation_type,arrows:'to'});
+});
+
+/* ---------- 5. Render ---------- */
+const network = new vis.Network(
+  document.getElementById('net'),
+  {nodes:[...nodes.values()],edges},
+  {
+    nodes:{shape:'dot',size:10,font:{size:12}},
+    groups:{
+      Persona :{color:{background:'#3B82F6'}},
+      Org     :{color:{background:'#22C55E'}},
+      Proyecto:{color:{background:'#F59E0B'}}
+    },
+    edges:{font:{align:'middle'}}
+  }
+);
+network.fit();
+</script>
+</body>
+</html>

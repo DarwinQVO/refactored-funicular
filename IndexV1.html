@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Grafo – Links v3</title>
+  <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+  <style>html,body,#net{width:100%;height:100%;margin:0;}body{font-family:system-ui,Arial,sans-serif;}</style>
+</head>
+<body>
+<div id="net"></div>
+
+<script>
+/* ---------- 1. Reglas ---------- */
+const schema={
+  "Persona-Org":["Founder_of","Co-Founder_of","Advisor_to","Investor_in"],
+  "Persona-Persona":["CEO_is","Investor_in"],
+  "Org-Persona":["CEO_is","Created_project"],
+  "Org-Org":["Rebranded_as","Acquired","Investor_in","Partner_with"],
+  "Org-Proyecto":["Created_project","Investor_in"]
+};
+
+/* ---------- 2. Tipos ---------- */
+const PERSONAS=new Set([
+  "Jordi Hays","Maria Tavierne","Matt Jung","Sarah Chase",
+  "Packy McCormick","Chris Quinn","Adam Ryan"
+]);
+
+const ORGS=new Set([
+  "Branded Native","Likewise","Party Round","Capital",
+  "Rho","Rorra","Workweek","J-Man",
+  "Andreessen Horowitz (a16z)","Gradient Ventures","Shrug Capital"
+]);
+
+const typeOf=n=>PERSONAS.has(n)?"Persona":ORGS.has(n)?"Org":"Proyecto";
+
+/* ---------- 3. CSV ---------- */
+const csv=`parent,child,relation,role,start
+Jordi Hays,Branded Native,Founder_of,Founder & ex-CEO,2016-01-01
+Jordi Hays,Likewise,Founder_of,Co-Founder,2020-03-01
+Jordi Hays,Party Round,Founder_of,Founder,2021-03-01
+Jordi Hays,Rorra,Co-Founder_of,Co-Founder,2024-01-01
+Jordi Hays,Workweek,Advisor_to,Advisor,2021-06-01
+Jordi Hays,J-Man,Founder_of,First micro-biz,2005-01-01
+Branded Native,Maria Tavierne,CEO_is,CEO,2023-01-01
+Party Round,Capital,Rebranded_as,,2022-10-04
+Rho,Capital,Acquired,,2023-10-01
+Matt Jung,Likewise,Co-Founder_of,Co-Founder,2020-03-01
+Sarah Chase,Party Round,Co-Founder_of,Co-Founder,2021-03-01
+Packy McCormick,Party Round,Investor_in,Pre-seed,2021-05-01
+Andreessen Horowitz (a16z),Party Round,Investor_in,,2021-05-01
+Gradient Ventures,Party Round,Investor_in,,2021-05-01
+Shrug Capital,Party Round,Investor_in,,2021-05-01
+Party Round,Chris Quinn,Created_project,Marketing mini-game,2021-08-01
+Chris Quinn,Branded Native,Investor_in,Early angel,2017-01-01
+Adam Ryan,Workweek,Founder_of,Founder,2021-01-01`;
+
+/* ---------- 4. Parse + filtro ---------- */
+const rows=csv.trim().split(/\n/).slice(1).map(l=>l.split(","));
+const nodes=new Map(),edges=[];
+rows.forEach(r=>{
+  const [p,c,rel]=r;
+  const pt=typeOf(p),ct=typeOf(c),key=`${pt}-${ct}`;
+  if(!(schema[key]||[]).includes(rel))return;
+
+  if(!nodes.has(p))nodes.set(p,{id:p,label:p,group:pt});
+  if(!nodes.has(c))nodes.set(c,{id:c,label:c,group:ct});
+  edges.push({from:p,to:c,label:rel,arrows:'to'});
+});
+
+/* ---------- 5. Render ---------- */
+new vis.Network(
+  document.getElementById('net'),
+  {nodes:[...nodes.values()],edges},
+  {
+    nodes:{shape:'dot',size:10,font:{size:12}},
+    groups:{
+      Persona :{color:{background:'#3B82F6'}},
+      Org     :{color:{background:'#22C55E'}},
+      Proyecto:{color:{background:'#F59E0B'}}
+    },
+    edges:{font:{align:'middle'}}
+  }
+).fit();
+</script>
+</body>
+</html>
